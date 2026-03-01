@@ -1,8 +1,16 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
+import os
 
 app = FastAPI(title="Madao FastAPI Test Project")
+
+# 挂载静态文件目录
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 class Item(BaseModel):
     name: str
@@ -76,3 +84,9 @@ async def delete_item(item_id: int):
 @app.get("/items/")
 async def list_items():
     return {"items": list(fake_db.values()), "total": len(fake_db)}
+
+# 飞机大战游戏页面
+@app.get("/game")
+async def game_page():
+    game_path = os.path.join(os.path.dirname(__file__), "static", "game.html")
+    return FileResponse(game_path, media_type="text/html")

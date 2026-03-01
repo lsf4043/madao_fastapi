@@ -50,3 +50,6 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Skills (包含敏感配置信息)
+.skills/
