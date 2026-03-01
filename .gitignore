@@ -53,3 +53,17 @@ logs/
 
 # Skills (包含敏感配置信息)
 .skills/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Deployment scripts (包含敏感信息)
+deploy_remote.py
+check_port.py
+check_service.py
+connect_server.ps1
+
+# Arts
+.arts/
