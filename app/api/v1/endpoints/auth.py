@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -10,6 +10,7 @@ from app.core.security import verify_password, get_password_hash, create_access_
 from app.core.config import settings
 from datetime import timedelta
 from typing import AsyncGenerator
+from pydantic import ValidationError
 
 router = APIRouter()
 security = HTTPBearer()
@@ -54,35 +55,50 @@ async def register(
     db: AsyncSession = Depends(get_db)
 ):
     """用户注册"""
-    # 检查用户名是否已存在
-    result = await db.execute(select(User).where(User.username == user_create.username))
-    if result.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="用户名已存在"
-        )
-
-    # 检查邮箱是否已存在
-    if user_create.email:
-        result = await db.execute(select(User).where(User.email == user_create.email))
+    try:
+        # 检查用户名是否已存在
+        result = await db.execute(select(User).where(User.username == user_create.username))
         if result.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="邮箱已被注册"
+                detail="用户名已被使用，请选择其他用户名"
             )
 
-    # 创建新用户
-    hashed_password = get_password_hash(user_create.password)
-    db_user = User(
-        username=user_create.username,
-        email=user_create.email,
-        hashed_password=hashed_password
-    )
-    db.add(db_user)
-    await db.commit()
-    await db.refresh(db_user)
+        # 检查邮箱是否已存在
+        if user_create.email:
+            result = await db.execute(select(User).where(User.email == user_create.email))
+            if result.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="该邮箱已被注册，请使用其他邮箱"
+                )
 
-    return db_user
+        # 创建新用户
+        hashed_password = get_password_hash(user_create.password)
+        db_user = User(
+            username=user_create.username,
+            email=user_create.email,
+            hashed_password=hashed_password
+        )
+        db.add(db_user)
+        await db.commit()
+        await db.refresh(db_user)
+
+        return db_user
+
+    except ValidationError as e:
+        # 处理Pydantic验证错误
+        errors = e.errors()
+        error_messages = []
+        for error in errors:
+            field = error.get('loc', ['未知字段'])[-1]
+            message = error.get('msg', '验证失败')
+            error_messages.append(f"{field}: {message}")
+
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="; ".join(error_messages)
+        )
 
 
 @router.post("/login", response_model=Token)
