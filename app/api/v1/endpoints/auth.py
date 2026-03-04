@@ -1,21 +1,23 @@
 # -*- coding: utf-8 -*-
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.database import get_db
 from app.models import User
-from app.schemas import UserCreate, UserLogin, UserResponse, Token, TokenData
+from app.schemas import UserCreate, UserLogin, UserResponse, Token
 from app.core.security import verify_password, get_password_hash, create_access_token, decode_token
 from app.core.config import settings
 from datetime import timedelta
+from typing import AsyncGenerator
 
 router = APIRouter()
 security = HTTPBearer()
 
 
-def get_current_user(
+async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ) -> User:
     """获取当前用户"""
     token = credentials.credentials
@@ -33,7 +35,10 @@ def get_current_user(
             detail="无效的认证凭据",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    user = db.query(User).filter(User.username == username).first()
+
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -44,11 +49,14 @@ def get_current_user(
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(user_create: UserCreate, db: Session = Depends(get_db)):
+async def register(
+    user_create: UserCreate,
+    db: AsyncSession = Depends(get_db)
+):
     """用户注册"""
     # 检查用户名是否已存在
-    db_user = db.query(User).filter(User.username == user_create.username).first()
-    if db_user:
+    result = await db.execute(select(User).where(User.username == user_create.username))
+    if result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="用户名已存在"
@@ -56,8 +64,8 @@ def register(user_create: UserCreate, db: Session = Depends(get_db)):
 
     # 检查邮箱是否已存在
     if user_create.email:
-        db_user = db.query(User).filter(User.email == user_create.email).first()
-        if db_user:
+        result = await db.execute(select(User).where(User.email == user_create.email))
+        if result.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="邮箱已被注册"
@@ -71,17 +79,22 @@ def register(user_create: UserCreate, db: Session = Depends(get_db)):
         hashed_password=hashed_password
     )
     db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
+    await db.commit()
+    await db.refresh(db_user)
 
     return db_user
 
 
 @router.post("/login", response_model=Token)
-def login(user_login: UserLogin, db: Session = Depends(get_db)):
+async def login(
+    user_login: UserLogin,
+    db: AsyncSession = Depends(get_db)
+):
     """用户登录"""
     # 查找用户
-    user = db.query(User).filter(User.username == user_login.username).first()
+    result = await db.execute(select(User).where(User.username == user_login.username))
+    user = result.scalar_one_or_none()
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -114,6 +127,6 @@ def login(user_login: UserLogin, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserResponse)
-def read_users_me(current_user: User = Depends(get_current_user)):
+async def read_users_me(current_user: User = Depends(get_current_user)):
     """获取当前用户信息"""
     return current_user

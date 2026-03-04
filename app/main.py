@@ -2,13 +2,26 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+from contextlib import asynccontextmanager
 from app.api.v1.api import api_router
 from app.core.config import settings
+from app.database import init_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理"""
+    # 启动时初始化数据库
+    await init_db()
+    yield
+    # 关闭时清理资源
+
 
 app = FastAPI(
     title="财经新闻爬取系统",
     description="爬取财经新闻资讯的FastAPI项目",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # 包含API路由
