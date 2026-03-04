@@ -81,6 +81,9 @@ def main():
         run_command(ssh, f"git clone {REPO_URL} {PROJECT_DIR}")
     else:
         print("项目目录已存在，正在更新...")
+        # 强制重置并拉取最新代码
+        run_command(ssh, f"cd {PROJECT_DIR} && git fetch origin")
+        run_command(ssh, f"cd {PROJECT_DIR} && git reset --hard origin/master")
         run_command(ssh, f"cd {PROJECT_DIR} && git pull origin master")
 
     # 安装依赖

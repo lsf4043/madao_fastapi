@@ -17,8 +17,8 @@ class Settings(BaseSettings):
     # CORS配置
     BACKEND_CORS_ORIGINS: List[str] = ["*"]
 
-    # 数据库配置
-    DATABASE_URL: str = "sqlite:///./finance_news.db"
+    # 数据库配置 - PostgreSQL
+    DATABASE_URL: str = "postgresql+asyncpg://lsf123456:123456@localhost:5432/finance_news"
 
     class Config:
         case_sensitive = True

@@ -3,13 +3,13 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.ext.declarative import declarative_base
 from app.core.config import settings
 
-# 将sqlite转换为异步URL
-DATABASE_URL = settings.DATABASE_URL.replace("sqlite:///", "sqlite+aiosqlite:///")
-
+# PostgreSQL异步引擎
 engine = create_async_engine(
-    DATABASE_URL,
+    settings.DATABASE_URL,
     echo=False,
-    future=True
+    future=True,
+    pool_size=10,
+    max_overflow=20
 )
 
 AsyncSessionLocal = async_sessionmaker(
