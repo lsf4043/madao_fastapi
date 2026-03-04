@@ -5,23 +5,47 @@ from bs4 import BeautifulSoup
 from typing import List, Dict, Optional
 from datetime import datetime
 import re
+import random
 
 
 class NewsCrawler:
     """财经新闻爬虫"""
 
     def __init__(self):
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        self.timeout = aiohttp.ClientTimeout(total=10)
+        # 多个User-Agent轮换
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15'
+        ]
+        self.timeout = aiohttp.ClientTimeout(total=15)
 
-    async def fetch_page(self, session: aiohttp.ClientSession, url: str) -> Optional[str]:
+    def get_random_headers(self, referer: str = None) -> dict:
+        """获取随机请求头"""
+        headers = {
+            'User-Agent': random.choice(self.user_agents),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'max-age=0',
+        }
+        if referer:
+            headers['Referer'] = referer
+        return headers
+
+    async def fetch_page(self, session: aiohttp.ClientSession, url: str, referer: str = None) -> Optional[str]:
         """异步获取页面内容"""
         try:
-            async with session.get(url, headers=self.headers) as response:
+            headers = self.get_random_headers(referer)
+            async with session.get(url, headers=headers, ssl=False) as response:
                 if response.status == 200:
                     return await response.text()
+                else:
+                    print(f"HTTP {response.status} for {url}")
         except Exception as e:
             print(f"Error fetching {url}: {e}")
         return None
@@ -31,25 +55,28 @@ class NewsCrawler:
         url = "https://finance.sina.com.cn/"
         news_list = []
 
-        async with aiohttp.ClientSession(timeout=self.timeout) as session:
-            html = await self.fetch_page(session, url)
-            if html:
-                soup = BeautifulSoup(html, 'lxml')
-                # 查找新闻标题和链接
-                news_items = soup.find_all('a', href=re.compile(r'https://finance.sina.com.cn/\d{4}-\d{2}-\d{2}/'))
+        try:
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                html = await self.fetch_page(session, url, "https://www.sina.com.cn/")
+                if html:
+                    soup = BeautifulSoup(html, 'lxml')
+                    # 查找新闻标题和链接
+                    news_items = soup.find_all('a', href=re.compile(r'https://finance.sina.com.cn/\d{4}-\d{2}-\d{2}/'))
 
-                for item in news_items[:10]:  # 限制数量
-                    title = item.get_text(strip=True)
-                    href = item.get('href', '')
+                    for item in news_items[:10]:  # 限制数量
+                        title = item.get_text(strip=True)
+                        href = item.get('href', '')
 
-                    if title and href and len(title) > 10:  # 过滤太短的标题
-                        news_list.append({
-                            'title': title,
-                            'url': href,
-                            'source': '新浪财经',
-                            'publish_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                            'summary': title[:50] + '...' if len(title) > 50 else title
-                        })
+                        if title and href and len(title) > 10:  # 过滤太短的标题
+                            news_list.append({
+                                'title': title,
+                                'url': href,
+                                'source': '新浪财经',
+                                'publish_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                'summary': title[:50] + '...' if len(title) > 50 else title
+                            })
+        except Exception as e:
+            print(f"新浪财经爬取失败: {e}")
 
         return news_list
 
@@ -58,25 +85,28 @@ class NewsCrawler:
         url = "https://www.eastmoney.com/"
         news_list = []
 
-        async with aiohttp.ClientSession(timeout=self.timeout) as session:
-            html = await self.fetch_page(session, url)
-            if html:
-                soup = BeautifulSoup(html, 'lxml')
-                # 查找新闻标题
-                news_items = soup.find_all('a', href=re.compile(r'https://finance.eastmoney.com/a/'))
+        try:
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                html = await self.fetch_page(session, url, "https://www.baidu.com/")
+                if html:
+                    soup = BeautifulSoup(html, 'lxml')
+                    # 查找新闻标题
+                    news_items = soup.find_all('a', href=re.compile(r'https://finance.eastmoney.com/a/'))
 
-                for item in news_items[:10]:
-                    title = item.get_text(strip=True)
-                    href = item.get('href', '')
+                    for item in news_items[:10]:
+                        title = item.get_text(strip=True)
+                        href = item.get('href', '')
 
-                    if title and href and len(title) > 10:
-                        news_list.append({
-                            'title': title,
-                            'url': href,
-                            'source': '东方财富',
-                            'publish_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                            'summary': title[:50] + '...' if len(title) > 50 else title
-                        })
+                        if title and href and len(title) > 10:
+                            news_list.append({
+                                'title': title,
+                                'url': href,
+                                'source': '东方财富',
+                                'publish_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                'summary': title[:50] + '...' if len(title) > 50 else title
+                            })
+        except Exception as e:
+            print(f"东方财富爬取失败: {e}")
 
         return news_list
 
