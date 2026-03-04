@@ -213,14 +213,17 @@
         function displayNews(news) {
             const newsListDiv = document.getElementById('newsList');
 
-            if (news.length === 0) {
+            // 检查数据结构
+            const items = news.items || news;
+
+            if (!items || items.length === 0) {
                 newsListDiv.innerHTML = '<div class="loading">暂无新闻</div>';
                 return;
             }
 
             const html = `
                 <ul class="news-list">
-                    ${news.map(item => `
+                    ${items.map(item => `
                         <li class="news-item">
                             <div class="news-title">${item.title}</div>
                             <div class="news-meta">

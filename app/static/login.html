@@ -185,7 +185,7 @@
             </div>
             <div class="form-group">
                 <label for="registerEmail">邮箱（可选）</label>
-                <input type="email" id="registerEmail" placeholder="请输入邮箱">
+                <input type="text" id="registerEmail" placeholder="请输入邮箱（可选）">
             </div>
             <div class="form-group">
                 <label for="registerPassword">密码</label>
@@ -276,13 +276,22 @@
                 return;
             }
 
+            // 构建请求数据，如果邮箱为空则不发送
+            const requestData = {
+                username: username,
+                password: password
+            };
+            if (email && email.trim()) {
+                requestData.email = email.trim();
+            }
+
             try {
                 const response = await fetch(`${API_BASE_URL}/auth/register`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ username, email, password })
+                    body: JSON.stringify(requestData)
                 });
 
                 const data = await response.json();
